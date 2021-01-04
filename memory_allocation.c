@@ -1,6 +1,7 @@
 #include <sys/mman.h>//for mmap()
 #include <stddef.h>//for NULL
 #include <pthread.h>//for pthread_mutex_t data type
+#include <string.h>//for memset
 
 //16 bytes of memory
 typedef char BLOCK[16];
@@ -48,48 +49,73 @@ header_t *getFreeBlock(size_t s){
 }
 
 void *malloc(size_t objectSize){
-  void *memBlock; size_t totalSize; header_t *myHeader;
+  void *memBlock; 
+  size_t totalSize; 
+  header_t *myHeader;
   
+  //if the size wasn't passed exit the function
   if(!objectSize) return NULL;
 
-  //lock global mutex object
   pthread_mutex_lock(&global_lock);
 
   myHeader = getFreeBlock(objectSize);
 
+  //if getFreeBlock found a block flagged as free
   if(myHeader){
+    //use this block for "memory allocation"
     myHeader->headerstruct.status = 0;
     pthread_mutex_unlock(&global_lock);
     return (void *)(myHeader+1);
   }
 
   totalSize = objectSize + sizeof(header_t);
-
   memBlock = mmap(NULL, totalSize, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  //if mmap error code is thrown exit the function
   if(memBlock == (void *)-1){
     pthread_mutex_unlock(&global_lock);
     return NULL;
   }
   
+  //instantiate our block
   myHeader = memBlock;
   myHeader->headerstruct.size = objectSize;
   myHeader->headerstruct.status = 0;
   myHeader->headerstruct.next = NULL;
 
+  //deal with linked list
   if(!head) head = myHeader;
-
   if(tail) tail->headerstruct.next = myHeader;
-
   tail = myHeader;
   pthread_mutex_unlock(&global_lock);
 
   return (void *)(myHeader+1);
 }
 
-/*
+
 void *calloc(size_t totalElements, size_t elementSize){
+  size_t totalSize; 
+  void *myMemory;
+
+  //if the total elements or the element size doesn't exist exit function
+  if(!totalElements || !elementSize) return NULL;
+
+  totalSize = elementSize * totalElements;
+
+  //if mul overflow exit the function
+  if(elementSize != (totalSize/totalElements)) return NULL;
+
+  myMemory = malloc(totalSize);
+
+  //if malloc failed exit the function
+  if(!myMemory) return NULL;
+
+  memset(myMemory, 0, totalSize);
+
+  return myMemory;
 }
 
+/*
 void *realloc(void *myMemory, size_t targetSize){
 }*/
 
