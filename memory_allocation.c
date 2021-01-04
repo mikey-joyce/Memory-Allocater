@@ -25,7 +25,7 @@ void free(void *);
 //Helper Function Prototypes
 header_t *getFreeBlock(size_t);
 
-//Keep track of head and tail of linked list
+//Keep track of head and tail of header linked list
 header_t *head, *tail;
 
 //Prevents multiple threads from concurrently accessing memory
@@ -91,7 +91,52 @@ void *calloc(size_t totalElements, size_t elementSize){
 }
 
 void *realloc(void *myMemory, size_t targetSize){
-}
+}*/
 
 void free(void *myMemory){
-}*/
+  header_t *myHeader, *currentHeaderNode;
+  void *breakCondition;
+
+  if(!myMemory){
+    return;
+  }
+
+  pthread_mutex_lock(&global_lock);
+
+  myHeader = ((header_t *)myMemory - 1);
+
+  //gives current value of the break condition (second parameter is 0)
+  breakCondition = mmap(NULL, 0, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+  //is the block we want to free at the end of the heap?
+  if(((char *)myMemory + myHeader->headerstruct.size) == breakCondition){
+    //if only one node
+    if(head == tail){
+      //free the node
+      head = tail = NULL;
+    }
+    else{
+      //otherwise traverse the list until we are the tail
+      currentHeaderNode = head;
+
+      while(currentHeaderNode){
+        if(currentHeaderNode->headerstruct.next == tail){
+          //free tail
+          currentHeaderNode->headerstruct.next = NULL;
+          tail = currentHeaderNode;
+        }
+
+        currentHeaderNode = currentHeaderNode->headerstruct.next;
+      }
+    }
+
+    //releases the amount of memory taken up by the target block
+    mmap(NULL, (0 - sizeof(header_t) - myHeader->headerstruct.size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    pthread_mutex_unlock(&global_lock);
+    return;
+  }
+
+  //if the block is not the last in the linked list, just flag the block as freed
+  myHeader->headerstruct.status = 1;
+  pthread_mutex_unlock(&global_lock);
+}
