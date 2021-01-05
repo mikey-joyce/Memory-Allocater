@@ -48,6 +48,11 @@ header_t *getFreeBlock(size_t s){
   return NULL;
 }
 
+/*This function takes a size as a parameter and will use this size to allocate memory.
+ Initially it will traverse our heap and see if it can find a block that has already been
+ allocated memory but is flagged as free. If it finds a block that fits the parameters it 
+ will return this block. Otherwise it will use the mmap function to map a new chunk of memory 
+ to the system and return the newly created block.*/
 void *malloc(size_t objectSize){
   void *memBlock; 
   size_t totalSize; 
@@ -92,7 +97,10 @@ void *malloc(size_t objectSize){
   return (void *)(myHeader+1);
 }
 
-
+/*This function takes a size that keeps track of the total elements and a size that 
+ keeps track of the element size. It will then calculate the total size of the block 
+ we want to create. After this it will malloc a new block and initialize this block 
+ to zero. After this it will return the new block.*/
 void *calloc(size_t totalElements, size_t elementSize){
   size_t totalSize; 
   void *myMemory;
@@ -115,17 +123,42 @@ void *calloc(size_t totalElements, size_t elementSize){
   return myMemory;
 }
 
-/*
+/*This program will take a given memory block and a size. It will then see if these parameters exist.
+ If one of them doesn't exist it will just malloc a block with the given size. If they both exist 
+ it will next check whether or not the given block is too large compared to the given size. If it 
+ is it will just return the original block and will not allocate a new block of memory. If the 
+ given size is larger than the given block it will then allocate a new memory block, free the given 
+ block, and return the new block to the calling program.*/
 void *realloc(void *myMemory, size_t targetSize){
-}*/
+  header_t *myHeader;
+  void *newMemory;
 
+  //if the memory block or given size doesn't exist return allocated memory of the given size
+  if(!myMemory || !targetSize) return malloc(targetSize);
+
+  myHeader = ((header_t *)myMemory - 1);
+
+  //if the given block is too big compared to given size return the given block
+  if(myHeader->headerstruct.size >= targetSize) return myMemory;
+
+  //make a new block
+  newMemory = malloc(targetSize);
+  if(newMemory){
+    memcpy(newMemory, myMemory, myHeader->headerstruct.size);
+    free(myMemory);
+  }
+
+  return newMemory;
+}
+
+/*This function will take in a memory block and either actually free this memory (if 
+ it exists at the end of the heap) or just flag the memory as free (if it is in the 
+ middle of the heap).*/
 void free(void *myMemory){
   header_t *myHeader, *currentHeaderNode;
   void *breakCondition;
 
-  if(!myMemory){
-    return;
-  }
+  if(!myMemory) return;
 
   pthread_mutex_lock(&global_lock);
 
